@@ -250,6 +250,7 @@ def decode_midi(idx_array, developer="Pzzzzz", file_path=None):
     event_sequence = [
         Event.from_token(idx) if not isinstance(idx, Event) else idx
         for idx in idx_array
+        if 'unk' not in idx
     ]
     # print(event_sequence)
     snote_seq = _event_seq2snote_seq(event_sequence)
@@ -275,7 +276,7 @@ def encode_single_worker(args, path):
     print(path)
     for file in os.listdir(path):
         whole_seq = encode_midi(os.path.join(path, file))
-        whole_seq = split_sequence(whole_seq, args.maxlen)
+        #whole_seq = split_sequence(whole_seq, args.maxlen)
         for seg in whole_seq:
             ls.append(seg)
     return ls
@@ -338,7 +339,6 @@ def main(args):
             pool.close()
             pool.join()
         global total
-        total = 15007
         print(total)
         base = total // 10
         train = base * 8
@@ -359,6 +359,13 @@ def main(args):
                 else:
                     vd.write(line)
                 ind += 1
+    else:
+        if args.file:
+            with open(args.file, "r") as fl:
+                a = fl.read()
+        else:
+            a = input()
+        decode_midi(a.split(), file_path="a.mid")
 
 
 def cli_main():
@@ -374,6 +381,7 @@ def cli_main():
     )
     gp1.add_argument("--datadir", metavar="DIR", default="data", help="data dir")
     gp1.add_argument("--maxlen", type=int, default=2048, help="max seqence lenghts")
+    gp2.add_argument("--file", default="fl.txt")
     args = parser.parse_args()
     main(args)
 

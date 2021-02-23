@@ -171,6 +171,7 @@ class TransformerLanguageModel(FairseqLanguageModel):
     def hub_models(cls):
         def moses_fastbpe(path):
             return {"path": path, "tokenizer": "moses", "bpe": "fastbpe"}
+
         def spm(path):
             return {"path": path, "tokenizer": "space", "bpe": "sentencepiece"}
 
@@ -407,4 +408,17 @@ def transformer_lm_gpt2_big(args):
     args.dropout = getattr(args, "dropout", 0.1)
     args.attention_dropout = getattr(args, "attention_dropout", 0.1)
     args.activation_fn = getattr(args, "activation_fn", "gelu")
+    base_lm_architecture(args)
+
+
+@register_model_architecture("transformer_lm", "transformer_lm_relative")
+def transformer_lm_relative(args):
+    args.relative_att = getattr(args, "relative_att", True)
+    base_lm_architecture(args)
+
+@register_model_architecture("transformer_lm", "transformer_lm_small")
+def transformer_lm_small(args):
+    args.decoder_embed_dim = getattr(args, "decoder_embed_dim", 256)
+    args.decoder_ffn_embed_dim = getattr(args, "decoder_ffn_embed_dim", 128)
+    args.decoder_attention_heads = getattr(args, "decoder_attention_heads", 4)
     base_lm_architecture(args)

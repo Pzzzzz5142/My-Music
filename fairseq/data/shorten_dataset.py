@@ -5,8 +5,11 @@
 
 import numpy as np
 from fairseq.data import data_utils
+import logging
 
 from . import BaseWrapperDataset
+
+logger = logging.getLogger(__name__)
 
 
 class TruncateDataset(BaseWrapperDataset):
@@ -43,30 +46,28 @@ class RandomCropDataset(TruncateDataset):
 
     @property
     def can_reuse_epoch_itr_across_epochs(self):
-        return True  # only the crop changes, not item sizes
+        return False  # only the crop changes, not item sizes
 
     def set_epoch(self, epoch, **unused):
         super().set_epoch(epoch)
         self.epoch = epoch
+        logger.info("Update epoch called. ")
 
     def __getitem__(self, index):
+        # logger.info("Current epoch: {}".format(self.epoch))
         with data_utils.numpy_seed(self.seed, self.epoch, index):
             item = self.dataset[index]
             item_len = item.size(0)
             excess = item_len - self.truncation_length
             if excess > 0:
                 start_idx = np.random.randint(0, excess)
+                # logger.info("Current start index: {}".format(start_idx))
                 item = item[start_idx : start_idx + self.truncation_length]
             return item
 
 
 def maybe_shorten_dataset(
-    dataset,
-    split,
-    shorten_data_split_list,
-    shorten_method,
-    tokens_per_sample,
-    seed,
+    dataset, split, shorten_data_split_list, shorten_method, tokens_per_sample, seed,
 ):
     truncate_split = (
         split in shorten_data_split_list.split(",") or len(shorten_data_split_list) == 0

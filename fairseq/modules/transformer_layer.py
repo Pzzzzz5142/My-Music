@@ -8,7 +8,12 @@ from typing import Dict, List, Optional
 import torch
 import torch.nn as nn
 from fairseq import utils
-from fairseq.modules import LayerNorm, MultiheadAttention
+from fairseq.modules import (
+    LayerNorm,
+    MultiheadAttention,
+    RelativeMultiheadAttention,
+    RelativeGlobalAttention,
+)
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
@@ -32,15 +37,15 @@ class TransformerEncoderLayer(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.embed_dim = args.encoder_embed_dim
-        self.quant_noise = getattr(args, 'quant_noise_pq', 0)
-        self.quant_noise_block_size = getattr(args, 'quant_noise_pq_block_size', 8) or 8
+        self.quant_noise = getattr(args, "quant_noise_pq", 0)
+        self.quant_noise_block_size = getattr(args, "quant_noise_pq_block_size", 8) or 8
         self.self_attn = self.build_self_attention(self.embed_dim, args)
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
         self.dropout_module = FairseqDropout(
             args.dropout, module_name=self.__class__.__name__
         )
         self.activation_fn = utils.get_activation_fn(
-            activation=getattr(args, 'activation_fn', 'relu') or "relu"
+            activation=getattr(args, "activation_fn", "relu") or "relu"
         )
         activation_dropout_p = getattr(args, "activation_dropout", 0) or 0
         if activation_dropout_p == 0:
@@ -184,11 +189,10 @@ class TransformerDecoderLayer(nn.Module):
 
         self.cross_self_attention = getattr(args, "cross_self_attention", False)
 
+        self.relative_att = getattr(args, "relative_att", True)
+
         self.self_attn = self.build_self_attention(
-            self.embed_dim,
-            args,
-            add_bias_kv=add_bias_kv,
-            add_zero_attn=add_zero_attn,
+            self.embed_dim, args, add_bias_kv=add_bias_kv, add_zero_attn=add_zero_attn,
         )
 
         self.activation_fn = utils.get_activation_fn(
@@ -245,6 +249,15 @@ class TransformerDecoderLayer(nn.Module):
     def build_self_attention(
         self, embed_dim, args, add_bias_kv=False, add_zero_attn=False
     ):
+        if self.relative_att:
+            return RelativeMultiheadAttention(
+                embed_dim,
+                args.decoder_attention_heads,
+                512,
+                dropout=args.attention_dropout,
+                add_bias_kv=add_bias_kv,
+                add_zero_attn=add_zero_attn,
+            )
         return MultiheadAttention(
             embed_dim,
             args.decoder_attention_heads,
@@ -257,6 +270,13 @@ class TransformerDecoderLayer(nn.Module):
         )
 
     def build_encoder_attention(self, embed_dim, args):
+        if self.relative_att:
+            return RelativeMultiheadAttention(
+                embed_dim,
+                args.decoder_attention_heads,
+                256,
+                dropout=args.attention_dropout,
+            )
         return MultiheadAttention(
             embed_dim,
             args.decoder_attention_heads,

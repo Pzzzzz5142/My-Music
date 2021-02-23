@@ -221,8 +221,9 @@ class FairseqTask(object):
         can_reuse_epoch_itr = not disable_iterator_cache and self.can_reuse_epoch_itr(
             dataset
         )
+        can_reuse_epoch_itr = False
         if can_reuse_epoch_itr and dataset in self.dataset_to_epoch_iter:
-            logger.debug("reusing EpochBatchIterator for epoch {}".format(epoch))
+            logger.info("reusing EpochBatchIterator for epoch {}".format(epoch))
             return self.dataset_to_epoch_iter[dataset]
 
         assert isinstance(dataset, FairseqDataset)
@@ -231,8 +232,8 @@ class FairseqTask(object):
         dataset.set_epoch(epoch)
 
         # get indices ordered by example size
-        with data_utils.numpy_seed(seed):
-            indices = dataset.ordered_indices()
+        #with data_utils.numpy_seed(seed):
+        indices = dataset.ordered_indices()
 
         # filter examples that are too large
         if max_positions is not None:
@@ -378,7 +379,7 @@ class FairseqTask(object):
         if seq_gen_cls is None:
             if getattr(args, "print_alignment", False):
                 seq_gen_cls = SequenceGeneratorWithAlignment
-                extra_gen_cls_kwargs['print_alignment'] = args.print_alignment
+                extra_gen_cls_kwargs["print_alignment"] = args.print_alignment
             else:
                 seq_gen_cls = SequenceGenerator
 

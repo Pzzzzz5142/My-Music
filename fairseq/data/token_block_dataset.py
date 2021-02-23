@@ -95,8 +95,7 @@ class TokenBlockDataset(FairseqDataset):
             )
         else:
             block_to_dataset_index = _get_block_to_dataset_index_fast(
-                sizes,
-                slice_indices,
+                sizes, slice_indices,
             )
         self._slice_indices = plasma_utils.PlasmaArray(slice_indices)
         self._sizes = plasma_utils.PlasmaArray(self._sizes)
@@ -166,3 +165,8 @@ class TokenBlockDataset(FairseqDataset):
                 for ds_idx in range(start_ds_idx, end_ds_idx + 1)
             }
         )
+
+    def set_epoch(self, epoch):
+        super().set_epoch(epoch)
+        if hasattr(self.dataset, "set_epoch"):
+            self.dataset.set_epoch(epoch)

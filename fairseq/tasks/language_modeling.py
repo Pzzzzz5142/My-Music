@@ -212,6 +212,9 @@ class LanguageModelingTask(LegacyFairseqTask):
             self.args.seed,
         )
 
+        logger.info(str(dataset[0]))
+        logger.info(str(dataset[0]))
+
         dataset = TokenBlockDataset(
             dataset,
             dataset.sizes,
@@ -221,6 +224,9 @@ class LanguageModelingTask(LegacyFairseqTask):
             break_mode=self.args.sample_break_mode,
             include_targets=True,
         )
+
+        logger.info(str(dataset[0]))
+        logger.info(str(dataset[0]))
 
         add_eos_for_other_targets = (
             self.args.sample_break_mode is not None

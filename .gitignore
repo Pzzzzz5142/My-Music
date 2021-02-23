@@ -118,3 +118,5 @@ data/
 
 # develop tmp file
 tmp_*
+*.out
+*.mid

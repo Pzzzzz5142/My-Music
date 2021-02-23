@@ -228,3 +228,8 @@ class MonolingualDataset(FairseqDataset):
 
     def prefetch(self, indices):
         self.dataset.prefetch(indices)
+
+    def set_epoch(self, epoch):
+        super().set_epoch(epoch)
+        if hasattr(self.dataset, "set_epoch"):
+            self.dataset.set_epoch(epoch)

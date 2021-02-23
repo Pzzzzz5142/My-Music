@@ -1,7 +1,10 @@
 import argparse
-from numpy.lib.arraysetops import isin
+from numpy.lib.arraysetops import in1d, isin
+from numpy.lib.utils import who
 import pretty_midi, os
 from multiprocessing import Pool
+import json
+from tqdm import tqdm
 
 RANGE_NOTE_ON = 128
 RANGE_NOTE_OFF = 128
@@ -194,6 +197,8 @@ def _control_preprocess(ctrl_changes):
 
 def _note_preprocess(susteins, notes):
     note_stream = []
+    if len(susteins) == 0:
+        return notes
 
     for sustain in susteins:
         for note_idx, note in enumerate(notes):
@@ -219,6 +224,8 @@ def encode_midi(file_path):
     mid = pretty_midi.PrettyMIDI(midi_file=file_path)
 
     for inst in mid.instruments:
+        if inst.program not in [0, 1]:
+            continue
         inst_notes = inst.notes
         # ctrl.number is the number of sustain control. If you want to know abour the number type of control,
         # see https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
@@ -250,7 +257,7 @@ def decode_midi(idx_array, developer="Pzzzzz", file_path=None):
     event_sequence = [
         Event.from_token(idx) if not isinstance(idx, Event) else idx
         for idx in idx_array
-        if 'unk' not in idx
+        if "unk" not in idx and "pad" not in idx
     ]
     # print(event_sequence)
     snote_seq = _event_seq2snote_seq(event_sequence)
@@ -268,18 +275,40 @@ def decode_midi(idx_array, developer="Pzzzzz", file_path=None):
     return mid
 
 
+maestro_json = None
 total = 0
 
 
-def encode_single_worker(args, path):
+def encode_single_worker_legacy(args, path):
     ls = []
-    print(path)
     for file in os.listdir(path):
-        whole_seq = encode_midi(os.path.join(path, file))
-        #whole_seq = split_sequence(whole_seq, args.maxlen)
+        try:
+            whole_seq = encode_midi(os.path.join(path, file))
+        except Exception as e:
+            print("Problematic file {}".format(file))
+            continue
+        ls.append(whole_seq)
+        """
+        for bg in range(0, max(len(whole_seq) - 2048, 1), 2048):
+            ls.append(whole_seq[bg : bg + 2048])
+        """
+        """
+        whole_seq = split_sequence(whole_seq, args.maxlen)
         for seg in whole_seq:
             ls.append(seg)
+        """
     return ls
+
+
+def encode_single_worker(args, jobs: list):
+    res = []
+    for job in tqdm(jobs):
+        whole_seq = encode_midi(
+            os.path.join(args.datadir, "maestro-v2.0.0", job["midi_filename"])
+        )
+        whole_seq = [job["split"]] + whole_seq
+        res.append(whole_seq)
+    return res
 
 
 def split_sequence(notes, max_length):
@@ -316,49 +345,45 @@ def split_sequence(notes, max_length):
 
 
 def main(args):
-    if args.encode:
+    if args.encode or True:
+        global maestro_json
+        maestro_json = json.load(
+            open(os.path.join(args.datadir, "maestro-v2.0.0.json"), "r")
+        )
         os.makedirs(args.destdir, exist_ok=True)
-        if not os.path.exists(args.destdir + "/a.token"):
-            pool = Pool(10)
-            fl = open(args.destdir + "/a.token", "w")
-            fl.close()
+        if not os.path.exists(args.destdir + "/a.token") or True:
+            pool = Pool(args.workers)
 
             def merge_results(worker_result):
-                global total
-                with open(args.destdir + "/a.token", "a") as fl:
+                global maestro_json
+                with open(args.destdir + "/mae.test.tokens", "a+") as tst, open(
+                    args.destdir + "/mae.train.tokens", "a+"
+                ) as tr, open(args.destdir + "/mae.valid.tokens", "a+") as vd:
                     for line in worker_result:
-                        fl.write(" ".join(line) + "\n")
-                    total += len(worker_result)
+                        split, line = line[0], " ".join(line[1:])
+                        line += "\n"
+                        if split == "train":
+                            tr.write(line)
+                        elif split == "test":
+                            tst.write(line)
+                        else:
+                            vd.write(line)
 
-            for base, a, files in os.walk(args.datadir):
-                if a == []:
-                    print("b")
-                    pool.apply_async(
-                        encode_single_worker, (args, base), callback=merge_results
-                    )
+            seg = (len(maestro_json) + args.workers - 1) // args.workers
+            ind = 0
+
+            for i in range(args.workers):
+                if i == args.workers - 1:
+                    seg = len(maestro_json)
+                pool.apply_async(
+                    encode_single_worker,
+                    (args, maestro_json[ind : ind + seg]),
+                    callback=merge_results,
+                )
+                print(ind, ind + seg)
+                ind += seg
             pool.close()
             pool.join()
-        global total
-        print(total)
-        base = total // 10
-        train = base * 8
-        valid = base
-        test = total - train - valid
-        with open(args.destdir + "/a.token", "r") as tk, open(
-            args.destdir + "/mae.test.tokens", "w"
-        ) as tst, open(args.destdir + "/mae.train.tokens", "w") as tr, open(
-            args.destdir + "/mae.valid.tokens", "w"
-        ) as vd:
-            ind = 0
-            print(ind)
-            for line in tk.readlines():
-                if ind < train:
-                    tr.write(line)
-                elif ind < train + test:
-                    tst.write(line)
-                else:
-                    vd.write(line)
-                ind += 1
     else:
         if args.file:
             with open(args.file, "r") as fl:
@@ -382,6 +407,7 @@ def cli_main():
     gp1.add_argument("--datadir", metavar="DIR", default="data", help="data dir")
     gp1.add_argument("--maxlen", type=int, default=2048, help="max seqence lenghts")
     gp2.add_argument("--file", default="fl.txt")
+    gp1.add_argument("--workers", type=int, default="10")
     args = parser.parse_args()
     main(args)
 

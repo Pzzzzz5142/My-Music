@@ -1,5 +1,5 @@
 fairseq-train --task language_modeling \
-  data-bin/maestro-v2.0.0 \
+  data-bin/cl \
   --save-dir /mnt/zhangyi/checkpoints/transformer_music \
   --arch music_transformer --share-decoder-input-output-embed \
   --dropout 0.1 \

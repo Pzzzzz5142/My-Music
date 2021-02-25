@@ -63,6 +63,8 @@ class RandomCropDataset(TruncateDataset):
                 start_idx = np.random.randint(0, excess)
                 # logger.info("Current start index: {}".format(start_idx))
                 item = item[start_idx : start_idx + self.truncation_length]
+            elif item_len<self.truncation_length:
+                item=item
             return item
 
 

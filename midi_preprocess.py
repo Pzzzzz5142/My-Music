@@ -356,11 +356,13 @@ def main(args):
 
             def merge_results(worker_result):
                 global maestro_json
-                with open(args.destdir + "/mae.test.tokens", "a+") as tst, open(
-                    args.destdir + "/mae.train.tokens", "a+"
-                ) as tr, open(args.destdir + "/mae.valid.tokens", "a+") as vd:
+                with open(args.destdir + "/maecl.test.tokens", "a+") as tst, open(
+                    args.destdir + "/maecl.train.tokens", "a+"
+                ) as tr, open(args.destdir + "/maecl.valid.tokens", "a+") as vd:
                     for line in worker_result:
                         split, line = line[0], " ".join(line[1:])
+                        if len(line.strip().split()) < 2048:
+                            continue
                         line += "\n"
                         if split == "train":
                             tr.write(line)

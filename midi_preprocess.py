@@ -345,13 +345,13 @@ def split_sequence(notes, max_length):
 
 
 def main(args):
-    if args.encode or True:
+    if args.encode:
         global maestro_json
         maestro_json = json.load(
             open(os.path.join(args.datadir, "maestro-v2.0.0.json"), "r")
         )
         os.makedirs(args.destdir, exist_ok=True)
-        if not os.path.exists(args.destdir + "/a.token") or True:
+        if not os.path.exists(args.destdir + "/a.token"):
             pool = Pool(args.workers)
 
             def merge_results(worker_result):

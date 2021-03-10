@@ -7,6 +7,7 @@ import math
 from dataclasses import dataclass
 
 import torch.nn.functional as F
+from torch.nn.modules.loss import CrossEntropyLoss
 from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 from fairseq.dataclass import FairseqDataclass
@@ -46,6 +47,12 @@ class CrossEntropyCriterion(FairseqCriterion):
         return loss, sample_size, logging_output
 
     def compute_loss(self, model, net_output, sample, reduce=True):
+        loss_func = CrossEntropyLoss()
+        y = net_output[0]
+        tgt = sample["target"]
+        y = y.reshape(y.shape[0] * y.shape[1], -1)
+        tgt = tgt.flatten()
+        return loss_func(y, tgt), None
         lprobs = model.get_normalized_probs(net_output, log_probs=True)
         lprobs = lprobs.view(-1, lprobs.size(-1))
         target = model.get_targets(sample, net_output).view(-1)
@@ -65,9 +72,12 @@ class CrossEntropyCriterion(FairseqCriterion):
         sample_size = sum(log.get("sample_size", 0) for log in logging_outputs)
 
         # we divide by log(2) to convert the loss from base e to base 2
+        """
         metrics.log_scalar(
             "loss", loss_sum / sample_size / math.log(2), sample_size, round=3
         )
+        """
+        metrics.log_scalar("loss", loss_sum, sample_size, round=3)
         if sample_size != ntokens:
             metrics.log_scalar(
                 "nll_loss", loss_sum / ntokens / math.log(2), ntokens, round=3

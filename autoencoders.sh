@@ -1,7 +1,7 @@
-fairseq-train --task language_modeling \
-  data-bin/new \
-  --save-dir /mnt/zhangyi/checkpoints/transformer_music_lm_old_cross \
-  --arch transformer_lm --share-decoder-input-output-embed \
+fairseq-train --task translation \
+  data-bin/autoencoder \
+  --save-dir /mnt/zhangyi/checkpoints/transformer_autoencoders \
+  --arch transformer_autoencoders --share-decoder-input-output-embed \
   --dropout 0.1 \
   --optimizer adam --adam-betas '(0.9, 0.98)' --weight-decay 0.01 --clip-norm 0.0 \
   --lr 0.0005 --lr-scheduler inverse_sqrt --warmup-updates 4000 --warmup-init-lr 1e-07 \

@@ -7,7 +7,7 @@ from midi_preprocess import encode_midi
 
 custom_lm = (
     TransformerLanguageModel.from_pretrained(
-        "/mnt/zhangyi/checkpoints/transformer_music_new/", "checkpoint_best.pt",
+        "/mnt/zhangyi/checkpoints/transformer_music_fs_split_fp16_relative_mixed/", "checkpoint_best.pt",
     )
     .cuda()
     .half()

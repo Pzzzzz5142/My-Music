@@ -5,8 +5,10 @@
 
 import numpy as np
 import torch
-
+import logging
 from . import FairseqDataset, data_utils
+
+logger = logging.getLogger(__name__)
 
 
 def collate(samples, pad_idx, eos_idx):
@@ -19,19 +21,13 @@ def collate(samples, pad_idx, eos_idx):
             for i in range(len(samples[0][key])):
                 res.append(
                     data_utils.collate_tokens(
-                        [s[key][i] for s in samples],
-                        pad_idx,
-                        eos_idx,
-                        left_pad=False,
+                        [s[key][i] for s in samples], pad_idx, eos_idx, left_pad=False,
                     )
                 )
             return res
         else:
             return data_utils.collate_tokens(
-                [s[key] for s in samples],
-                pad_idx,
-                eos_idx,
-                left_pad=False,
+                [s[key] for s in samples], pad_idx, eos_idx, left_pad=False,
             )
 
     src_tokens = merge("source")
@@ -40,8 +36,12 @@ def collate(samples, pad_idx, eos_idx):
         target = merge("target", is_target_list)
     else:
         target = src_tokens
-
-    return {
+    if samples[0]["pre_output"] is not None:
+        is_pre_output_list = isinstance(samples[0]["pre_output"], list)
+        pre_output = merge("pre_output", is_pre_output_list)
+    else:
+        pre_output = None
+    item = {
         "id": torch.LongTensor([s["id"] for s in samples]),
         "nsentences": len(samples),
         "ntokens": sum(len(s["source"]) for s in samples),
@@ -51,6 +51,27 @@ def collate(samples, pad_idx, eos_idx):
         },
         "target": target,
     }
+    if pre_output != None:
+        item["net_input"]["pre_output"] = pre_output
+    return item
+
+
+class ModNote(object):
+    def __init__(self, origin, after) -> None:
+        self.origin = origin
+        self.after = after
+
+    def __eq__(self, o: object) -> bool:
+        if hasattr(o, "origin"):
+            return self.origin == o.origin
+        else:
+            return str(self.origin) == str(o)
+
+    def __str__(self) -> str:
+        return str(self.origin)
+
+    def __repr__(self) -> str:
+        return str(self.origin)
 
 
 class MonolingualDataset(FairseqDataset):
@@ -73,8 +94,11 @@ class MonolingualDataset(FairseqDataset):
         tgt_vocab,
         add_eos_for_other_targets,
         shuffle,
+        split,
         targets=None,
         add_bos_token=False,
+        noisy=False,
+        Autoencoding=False,
     ):
         self.dataset = dataset
         self.sizes = np.array(sizes)
@@ -83,6 +107,10 @@ class MonolingualDataset(FairseqDataset):
         self.add_eos_for_other_targets = add_eos_for_other_targets
         self.shuffle = shuffle
         self.add_bos_token = add_bos_token
+        self.noisy = noisy
+        self.Autoencoding = Autoencoding
+        if split != "train":
+            self.noisy = False
 
         assert targets is None or all(
             t in {"self", "future", "past"} for t in targets
@@ -105,11 +133,28 @@ class MonolingualDataset(FairseqDataset):
             source, target = self._make_source_target(
                 source, future_target, past_target
             )
+            if self.noisy:
+                noisy = self.noise_it(target if self.Autoencoding else source)
         else:
             source = self.dataset[index]
             target = None
         source, target = self._maybe_add_bos(source, target)
-        return {"id": index, "source": source, "target": target}
+        if self.Autoencoding:
+            pre_output = source
+            if self.noisy:
+                source = noisy
+            else:
+                source = target
+        else:
+            if self.noisy:
+                source = noisy
+            pre_output = None
+        return {
+            "id": index,
+            "source": source,
+            "target": target,
+            "pre_output": pre_output,
+        }
 
     def __len__(self):
         return len(self.dataset)
@@ -233,3 +278,60 @@ class MonolingualDataset(FairseqDataset):
         super().set_epoch(epoch)
         if hasattr(self.dataset, "set_epoch"):
             self.dataset.set_epoch(epoch)
+
+    def noise_it(self, seq):
+        def decode(seq):
+            return [self.vocab[i] for i in seq]
+
+        def encode(seq, original):
+            return original.new([self.vocab.indices[i] for i in seq])
+
+        def apply_noise(seq):
+            res = []
+            tmp = []
+
+            for i in seq:
+                if "time" in i:
+                    pre, tm = i[1:-1].split(",")
+                    tm = int(tm)
+                    tm += np.random.randint(
+                        int(-tm * 0.025 - 0.5), int(tm * 0.025 + 0.5) + 1
+                    )
+                    tm = min(tm, 99)
+                    tm = max(tm, 0)
+                    res.append("<{},{}>".format(pre, tm))
+                elif "note" in i:
+                    if "on" in i:
+                        pre, tm = i[1:-1].split(",")
+                        tm = int(tm)
+                        t = np.random.randint(-3, 4)
+                        tm += t
+                        tm = min(tm, 127)
+                        tm = max(tm, 0)
+                        tmp.append(ModNote(tm, tm))
+                        res.append("<{},{}>".format(pre, tm))
+                    else:
+                        pre, tm = i[1:-1].split(",")
+                        if tm in tmp:
+                            xx = tmp[tmp.index(tm)]
+                            res.append("<{},{}>".format(pre, xx.after))
+                            tmp.remove(xx)
+                            pass
+                        else:
+                            res.append(i)
+
+                else:
+                    res.append(i)
+            return res
+
+        original = seq
+
+        seq = decode(seq)
+
+        seq = apply_noise(seq)
+
+        seq = encode(seq, original)
+
+        logger.info("123123")
+
+        return seq

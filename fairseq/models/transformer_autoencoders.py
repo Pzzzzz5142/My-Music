@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 
 import torch
 from fairseq.models.transformer import TransformerModel
@@ -7,14 +7,11 @@ from fairseq.models import register_model, register_model_architecture
 
 @register_model("transformer_autoencoders")
 class TransformerAutoencoders(TransformerModel):
-    def __init__(self, args, encoder, decoder):
-        super().__init__(encoder, decoder)
-
     def forward(
         self,
         src_tokens,
-        src_lengths,
-        prev_output_tokens,
+        src_lengths: Optional[Any] = None,
+        pre_output: Optional[Any] = None,
         return_all_hiddens: bool = True,
         features_only: bool = False,
         alignment_layer: Optional[int] = None,
@@ -27,11 +24,16 @@ class TransformerAutoencoders(TransformerModel):
         which are not supported by TorchScript.
         """
         encoder_out = self.encoder(
-            src_tokens, src_lengths=src_lengths, return_all_hiddens=return_all_hiddens
+            src_tokens, src_lengths=src_lengths, return_all_hiddens=return_all_hiddens,
         )
-        encoder_out = torch.mean(encoder_out, dim=1, keepdim=True)
+        encoder_out["encoder_out"][0] = torch.mean(
+            encoder_out["encoder_out"][0], dim=0, keepdim=True
+        )
+        encoder_out["encoder_padding_mask"][0] = encoder_out["encoder_padding_mask"][0][
+            ..., :1
+        ]
         decoder_out = self.decoder(
-            prev_output_tokens,
+            pre_output,
             encoder_out=encoder_out,
             features_only=features_only,
             alignment_layer=alignment_layer,
@@ -40,6 +42,10 @@ class TransformerAutoencoders(TransformerModel):
             return_all_hiddens=return_all_hiddens,
         )
         return decoder_out
+
+    @property
+    def supported_targets(self):
+        return {"future", "self", "past"}
 
 
 @register_model_architecture("transformer_autoencoders", "transformer_autoencoders")
@@ -94,3 +100,6 @@ def transformer_autoencoders(args):
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
     args.quant_noise_pq_block_size = getattr(args, "quant_noise_pq_block_size", 8)
     args.quant_noise_scalar = getattr(args, "quant_noise_scalar", 0)
+
+    args.max_source_positions = 2048
+    args.max_target_positions = 2048

@@ -1,3 +1,4 @@
+from fairseq.data.fasta_dataset import FastaDataset
 import torch
 import torch.nn as nn
 from torch.nn.modules.normalization import LayerNorm
@@ -10,6 +11,9 @@ from fairseq.models import (
 )
 from fairseq.modules.positional_encoding import PositionalEncoding
 from fairseq.modules.rpr import TransformerEncoderRPR, TransformerEncoderLayerRPR
+import logging
+
+logger = logging.getLogger(__name__)
 
 RANGE_NOTE_ON = 128
 RANGE_NOTE_OFF = 128
@@ -27,6 +31,7 @@ TORCH_INT = torch.int32
 TORCH_LABEL_TYPE = torch.long
 
 PREPEND_ZEROS_WIDTH = 4
+
 
 # MusicTransformer
 @register_model("music_transformer")
@@ -146,7 +151,7 @@ class HAHA(FairseqDecoder):
 
     # forward
     def forward(
-        self, x, mask=True, src_lengths=None,
+        self, x, mask=False, src_lengths=None,
     ):
         """
         ----------

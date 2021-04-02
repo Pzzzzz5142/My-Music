@@ -73,9 +73,7 @@ class CrossEntropyCriterion(FairseqCriterion):
         """
         metrics.log_scalar("loss", loss_sum / sample_size, sample_size, round=3)
         if sample_size != ntokens:
-            metrics.log_scalar(
-                "nll_loss", loss_sum / ntokens / math.log(2), ntokens, round=3
-            )
+            metrics.log_scalar("nll_loss", loss_sum / ntokens, ntokens, round=3)
             metrics.log_derived(
                 "ppl", lambda meters: utils.get_perplexity(meters["nll_loss"].avg)
             )

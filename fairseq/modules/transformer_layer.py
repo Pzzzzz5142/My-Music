@@ -189,7 +189,7 @@ class TransformerDecoderLayer(nn.Module):
 
         self.cross_self_attention = getattr(args, "cross_self_attention", False)
 
-        self.relative_att = getattr(args, "relative_att", True)
+        self.relative_att = getattr(args, "relative_att", False)
 
         self.self_attn = self.build_self_attention(
             self.embed_dim, args, add_bias_kv=add_bias_kv, add_zero_attn=add_zero_attn,

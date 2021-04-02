@@ -1,6 +1,6 @@
 fairseq-preprocess \
-    --source-lang en --target-lang de \
-    --trainpref data/mae.train.tokens \
-    --validpref data/mae.valid.tokens \
-    --testpref data/mae.test.tokens \
-    --destdir data-bin/autoencoder --workers 20
+    --only-source \
+    --trainpref fake_one_beat_512.tokens.train \
+    --validpref fake_one_beat_512.tokens.valid \
+    --testpref fake_one_beat_512.tokens.test \
+    --destdir data-bin/fake_512 --workers 20

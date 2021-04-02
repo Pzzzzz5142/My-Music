@@ -570,6 +570,7 @@ class RelativeMultiheadAttention(nn.Module):
         need_weights=True,
         static_kv=False,
         attn_mask=None,
+        need_head_weights=True
     ):
         """Input shape: Time x Batch x Channel
 

@@ -213,7 +213,6 @@ class LanguageModelingTask(LegacyFairseqTask):
         )
 
         logger.info(str(dataset[0]))
-        logger.info(str(dataset[0]))
 
         dataset = TokenBlockDataset(
             dataset,
@@ -225,7 +224,6 @@ class LanguageModelingTask(LegacyFairseqTask):
             include_targets=True,
         )
 
-        logger.info(str(dataset[0]))
         logger.info(str(dataset[0]))
 
         add_eos_for_other_targets = (
@@ -242,6 +240,8 @@ class LanguageModelingTask(LegacyFairseqTask):
             shuffle=True,
             targets=self.targets,
             add_bos_token=self.args.add_bos_token,
+            noisy=True,
+            split=split,
         )
 
     def _initialize_dataset(self, **kwargs):

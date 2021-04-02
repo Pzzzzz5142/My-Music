@@ -221,9 +221,7 @@ class FairseqTask(object):
         can_reuse_epoch_itr = not disable_iterator_cache and self.can_reuse_epoch_itr(
             dataset
         )
-        can_reuse_epoch_itr = False
         if can_reuse_epoch_itr and dataset in self.dataset_to_epoch_iter:
-            logger.info("reusing EpochBatchIterator for epoch {}".format(epoch))
             return self.dataset_to_epoch_iter[dataset]
 
         assert isinstance(dataset, FairseqDataset)

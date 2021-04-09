@@ -240,7 +240,7 @@ class LanguageModelingTask(LegacyFairseqTask):
             shuffle=True,
             targets=self.targets,
             add_bos_token=self.args.add_bos_token,
-            noisy=True,
+            noisy=False,
             split=split,
         )
 

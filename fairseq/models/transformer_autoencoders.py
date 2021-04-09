@@ -10,8 +10,8 @@ class TransformerAutoencoders(TransformerModel):
     def forward(
         self,
         src_tokens,
-        src_lengths: Optional[Any] = None,
         pre_output: Optional[Any] = None,
+        src_lengths: Optional[Any] = None,
         return_all_hiddens: bool = True,
         features_only: bool = False,
         alignment_layer: Optional[int] = None,

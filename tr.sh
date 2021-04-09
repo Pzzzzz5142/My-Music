@@ -1,6 +1,6 @@
 fairseq-train --task language_modeling \
-  data-bin/new \
-  --save-dir /mnt/zhangyi/checkpoints/transformer_music_lm_old_cross \
+  data-bin/mae_remi \
+  --save-dir /mnt/zhangyi/checkpoints/transformer_music_lm_mae_./remi \
   --arch transformer_lm --share-decoder-input-output-embed \
   --dropout 0.1 \
   --optimizer adam --adam-betas '(0.9, 0.98)' --weight-decay 0.01 --clip-norm 0.0 \
@@ -9,4 +9,3 @@ fairseq-train --task language_modeling \
   --max-tokens 4096 --update-freq 1 \
   --max-update 50000 \
   --future-target \
-  --fp16

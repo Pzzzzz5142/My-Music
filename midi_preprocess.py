@@ -218,7 +218,7 @@ def _note_preprocess(susteins, notes):
     return note_stream
 
 
-def encode_midi(file_path):
+def encode_midi(file_path) -> list:
     events = []
     notes = []
     mid = pretty_midi.PrettyMIDI(midi_file=file_path)
@@ -310,6 +310,40 @@ def encode_single_worker(args, jobs: list):
         res.append(whole_seq)
     return res
 
+def remi_encode_single_worker(args,jobs:list):
+    def encode_remi(path):
+        def extract_events(input_path):
+            import utils
+            note_items, tempo_items = utils.read_items(input_path)
+            note_items = utils.quantize_items(note_items)
+            max_time = note_items[-1].end
+            chord_items = utils.extract_chords(note_items)
+            items = chord_items + tempo_items + note_items
+            groups = utils.group_items(items, max_time)
+            events = utils.item2event(groups)
+            return events
+        midi_paths = [path]
+        all_events = []
+        for path in midi_paths:
+            events = extract_events(path)
+            all_events.append(events)
+        # event to word
+        all_words = []
+        for events in all_events:
+            words = []
+            for event in events:
+                e = "{}_{}".format(event.name, event.value)
+                words.append(e.replace(" ", "_"))
+            all_words.append(words)
+        return all_words[0]  
+    res = []
+    for job in tqdm(jobs):
+        whole_seq = encode_remi(
+            os.path.join(args.datadir, "maestro-v2.0.0", job["midi_filename"])
+        )
+        whole_seq = [job["split"]] + whole_seq
+        res.append(whole_seq)
+    return res    
 
 def split_sequence(notes, max_length):
     on_ls = []
@@ -345,7 +379,7 @@ def split_sequence(notes, max_length):
 
 
 def main(args):
-    if args.encode:
+    if True:
         global maestro_json
         maestro_json = json.load(
             open(os.path.join(args.datadir, "maestro-v2.0.0.json"), "r")
@@ -356,9 +390,9 @@ def main(args):
 
             def merge_results(worker_result):
                 global maestro_json
-                with open(args.destdir + "/maecl.test.tokens", "a+") as tst, open(
-                    args.destdir + "/maecl.train.tokens", "a+"
-                ) as tr, open(args.destdir + "/maecl.valid.tokens", "a+") as vd:
+                with open(args.destdir + "/mae_remi.test.tokens", "a+") as tst, open(
+                    args.destdir + "/mae_remi.train.tokens", "a+"
+                ) as tr, open(args.destdir + "/mae_remi.valid.tokens", "a+") as vd:
                     for line in worker_result:
                         split, line = line[0], " ".join(line[1:])
                         if len(line.strip().split()) < 2048:
@@ -378,7 +412,7 @@ def main(args):
                 if i == args.workers - 1:
                     seg = len(maestro_json)
                 pool.apply_async(
-                    encode_single_worker,
+                    remi_encode_single_worker,
                     (args, maestro_json[ind : ind + seg]),
                     callback=merge_results,
                 )
@@ -409,7 +443,7 @@ def cli_main():
     gp1.add_argument("--datadir", metavar="DIR", default="data", help="data dir")
     gp1.add_argument("--maxlen", type=int, default=2048, help="max seqence lenghts")
     gp2.add_argument("--file", default="fl.txt")
-    gp1.add_argument("--workers", type=int, default="10")
+    gp1.add_argument("--workers", type=int, default="1")
     args = parser.parse_args()
     main(args)
 

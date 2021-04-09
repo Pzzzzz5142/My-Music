@@ -151,7 +151,7 @@ class HAHA(FairseqDecoder):
 
     # forward
     def forward(
-        self, x, mask=False, src_lengths=None,
+        self, x, mask=True, src_lengths=None,
     ):
         """
         ----------

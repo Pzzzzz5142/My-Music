@@ -122,3 +122,4 @@ tmp_*
 *.mid
 fl
 saved_models/*
+*.loss

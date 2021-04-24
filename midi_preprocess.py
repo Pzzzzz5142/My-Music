@@ -306,7 +306,9 @@ def encode_single_worker(args, jobs: list):
         whole_seq = encode_midi(
             os.path.join(args.datadir, "maestro-v2.0.0", job["midi_filename"])
         )
-        whole_seq = [job["split"]] + whole_seq
+        decode_midi(whole_seq,file_path=os.path.join('data','mae-remove-sustain',job['midi_filename']))
+        continue
+        whole_seq = [job["midi_filename"]] + whole_seq
         res.append(whole_seq)
     return res
 
@@ -339,7 +341,7 @@ def remi_encode_single_worker(args,jobs:list):
     res = []
     for job in tqdm(jobs):
         whole_seq = encode_remi(
-            os.path.join(args.datadir, "maestro-v2.0.0", job["midi_filename"])
+            os.path.join(args.datadir, "mae-remove-sustain", job["midi_filename"])
         )
         whole_seq = [job["split"]] + whole_seq
         res.append(whole_seq)

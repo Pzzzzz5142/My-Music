@@ -12,6 +12,9 @@ from fairseq import search, utils
 from fairseq.data import data_utils
 from fairseq.models import FairseqIncrementalDecoder
 from torch import Tensor
+import logging
+
+logger=logging.getLogger(__name__)
 
 
 class SequenceGenerator(nn.Module):

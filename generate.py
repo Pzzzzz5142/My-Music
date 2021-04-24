@@ -1,5 +1,3 @@
-from torch._C import dtype
-from torch.tensor import Tensor
 from fairseq.models.transformer_lm import TransformerLanguageModel
 from fairseq.models.transformer_autoencoders import TransformerAutoencoders
 import torch
@@ -44,18 +42,18 @@ def topk_sampling(x, topk):
 
 custom_lm = (
     TransformerLanguageModel.from_pretrained(
-        "/mnt/zhangyi/checkpoints/transformer_music_lm_remi_hi", "checkpoint_best.pt",
+        "/mnt/zhangyi/checkpoints/transformer_music_lm_remi_midi", "checkpoint_best.pt",
     )
     .cuda()
     .half()
     .eval()
 )
 model = custom_lm.models[0]
-for i in range(86, 100):
+for i in range(0, 100):
     l = 2048
     a = []
     s = 1
-    ss = "Bar_None"
+    ss = "<time_shift,0>"
     if len(ss) == 0:
         input_sequence = custom_lm.encode(" ".join(encode_midi("primer.mid")))[:-1]
         with open("data/mae.test.tokens", "r") as fl:
@@ -101,7 +99,6 @@ for i in range(86, 100):
         print(e)
         print("Abort lenght {}".format(len(a)))
     try:
-        decode_midi(a, file_path="final.mid")
-        decode_midi(ss, file_path="primer2.mid")
+        decode_midi(a, file_path="remi_midi/{}.mid".format(i))
     except:
-        utils.write_midi(a, None, "top5_hi/{}.mid".format(i), None)
+        utils.write_midi(a, None, "remi_midi/{}.mid".format(i), None)

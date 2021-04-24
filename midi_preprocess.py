@@ -1,6 +1,6 @@
 import argparse
-from numpy.lib.arraysetops import in1d, isin
-from numpy.lib.utils import who
+from glob import glob
+from threading import Thread
 import pretty_midi, os
 from multiprocessing import Pool
 import json
@@ -276,7 +276,7 @@ def decode_midi(idx_array, developer="Pzzzzz", file_path=None):
 
 
 maestro_json = None
-total = 0
+cnt = 0
 
 
 def encode_single_worker_legacy(args, path):
@@ -300,22 +300,25 @@ def encode_single_worker_legacy(args, path):
     return ls
 
 
-def encode_single_worker(args, jobs: list):
+def encode_single_worker(args, Theard_ind, jobs: list) -> list:
     res = []
     for job in tqdm(jobs):
-        whole_seq = encode_midi(
-            os.path.join(args.datadir, "maestro-v2.0.0", job["midi_filename"])
-        )
-        decode_midi(whole_seq,file_path=os.path.join('data','mae-remove-sustain',job['midi_filename']))
-        continue
-        whole_seq = [job["midi_filename"]] + whole_seq
+        if args.other:
+            whole_seq = encode_midi(job)
+        else:
+            whole_seq = encode_midi(
+                os.path.join(args.datadir, "maestro-v2.0.0", job["midi_filename"])
+            )
+            whole_seq = [job["midi_filename"]] + whole_seq
         res.append(whole_seq)
-    return res
+    return res, Theard_ind
 
-def remi_encode_single_worker(args,jobs:list):
+
+def remi_encode_single_worker(args, jobs: list):
     def encode_remi(path):
         def extract_events(input_path):
             import utils
+
             note_items, tempo_items = utils.read_items(input_path)
             note_items = utils.quantize_items(note_items)
             max_time = note_items[-1].end
@@ -324,6 +327,7 @@ def remi_encode_single_worker(args,jobs:list):
             groups = utils.group_items(items, max_time)
             events = utils.item2event(groups)
             return events
+
         midi_paths = [path]
         all_events = []
         for path in midi_paths:
@@ -337,7 +341,8 @@ def remi_encode_single_worker(args,jobs:list):
                 e = "{}_{}".format(event.name, event.value)
                 words.append(e.replace(" ", "_"))
             all_words.append(words)
-        return all_words[0]  
+        return all_words[0]
+
     res = []
     for job in tqdm(jobs):
         whole_seq = encode_remi(
@@ -345,7 +350,8 @@ def remi_encode_single_worker(args,jobs:list):
         )
         whole_seq = [job["split"]] + whole_seq
         res.append(whole_seq)
-    return res    
+    return res
+
 
 def split_sequence(notes, max_length):
     on_ls = []
@@ -381,16 +387,75 @@ def split_sequence(notes, max_length):
 
 
 def main(args):
-    if True:
+    os.makedirs(args.destdir, exist_ok=True)
+
+    if args.other:
+        midi_files = glob(os.path.join(args.datadir, "*.mid"))
+        midi_files += glob(os.path.join(args.datadir, "*.midi"))
+        assert len(midi_files) != 0, "No midi file found under path {}".format(
+            args.datadir
+        )
+
+        total = len(midi_files)
+        train = 8 * total // 10
+        valid = total // 10
+        test = total - train - valid
+        cnt = 0
+
+        prefix = os.path.split(args.datadir)[-1]
+
+        print(
+            "Total {} midi files, split to {} train sample(s) | {} test sample(s) | {} train sample(s)\nPrefix: {}".format(
+                total, train, test, valid, prefix
+            )
+        )
+
+        pool = Pool(args.workers)
+
+        def merge_results(worker_result):
+            global cnt
+            worker_result, Thread_ind = worker_result
+            with open(
+                os.path.join(args.destdir, f"{prefix}.test.tokens"), "a+"
+            ) as tst, open(
+                os.path.join(args.destdir, f"{prefix}.train.tokens"), "a+"
+            ) as tr, open(
+                os.path.join(args.destdir, f"{prefix}.valid.tokens"), "a+"
+            ) as vd:
+                for line in worker_result:
+                    line = " ".join(line)
+                    line += "\n"
+                    if cnt < train:
+                        tr.write(line)
+                    elif cnt < train + test:
+                        tst.write(line)
+                    else:
+                        vd.write(line)
+                    cnt += 1
+            print(f"{Thread_ind} finished. ")
+
+        step = (total + args.workers - 1) // args.workers
+        for ind in range(0, total, step):
+            result = pool.apply_async(
+                encode_single_worker,
+                (args, ind, midi_files[ind : ind + step]),
+                callback=merge_results,
+            )
+        result.get()
+        pool.close()
+        pool.join()
+
+    else:
         global maestro_json
         maestro_json = json.load(
             open(os.path.join(args.datadir, "maestro-v2.0.0.json"), "r")
         )
-        os.makedirs(args.destdir, exist_ok=True)
+
         if not os.path.exists(args.destdir + "/a.token"):
             pool = Pool(args.workers)
 
             def merge_results(worker_result):
+                Thread_ind, worker_result = worker_result
                 global maestro_json
                 with open(args.destdir + "/mae_remi.test.tokens", "a+") as tst, open(
                     args.destdir + "/mae_remi.train.tokens", "a+"
@@ -406,6 +471,7 @@ def main(args):
                             tst.write(line)
                         else:
                             vd.write(line)
+                print(f"{Thread_ind} finished. ")
 
             seg = (len(maestro_json) + args.workers - 1) // args.workers
             ind = 0
@@ -422,30 +488,19 @@ def main(args):
                 ind += seg
             pool.close()
             pool.join()
-    else:
-        if args.file:
-            with open(args.file, "r") as fl:
-                a = fl.read()
-        else:
-            a = input()
-        decode_midi(a.split(), file_path="a.mid")
 
 
 def cli_main():
     parser = argparse.ArgumentParser("midi preprocess parser")
 
-    gp = parser.add_mutually_exclusive_group()
-    gp1 = gp.add_argument_group()
-    gp2 = gp.add_argument_group()
-    gp1.add_argument("--encode", action="store_true", help="choose to encode")
-    gp2.add_argument("--decode", action="store_true", help="choose to decode")
     parser.add_argument(
-        "--destdir", metavar="DIR", default="data", help="destination dir"
+        "--destdir", metavar="DIR", default="./", help="destination dir"
     )
-    gp1.add_argument("--datadir", metavar="DIR", default="data", help="data dir")
-    gp1.add_argument("--maxlen", type=int, default=2048, help="max seqence lenghts")
-    gp2.add_argument("--file", default="fl.txt")
-    gp1.add_argument("--workers", type=int, default="1")
+    parser.add_argument(
+        "--other", action="store_true", default=False, help="using maestro or not"
+    )
+    parser.add_argument("--datadir", metavar="DIR", default="data", help="data dir")
+    parser.add_argument("--workers", type=int, default="20")
     args = parser.parse_args()
     main(args)
 

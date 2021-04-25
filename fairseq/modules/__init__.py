@@ -28,6 +28,7 @@ from .multihead_attention import (
     MultiheadAttention,
     RelativeMultiheadAttention,
     RelativeGlobalAttention,
+    MultiheadCoverageAttention,
 )
 from .positional_embedding import PositionalEmbedding
 from .same_pad import SamePad
@@ -78,4 +79,5 @@ __all__ = [
     "VGGBlock",
     "unfold1d",
     "RelativeMultiheadAttention",
+    "MultiheadCoverageAttention",
 ]

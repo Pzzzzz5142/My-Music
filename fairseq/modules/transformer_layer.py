@@ -13,6 +13,7 @@ from fairseq.modules import (
     MultiheadAttention,
     RelativeMultiheadAttention,
     RelativeGlobalAttention,
+    MultiheadCoverageAttention,
 )
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
@@ -190,6 +191,7 @@ class TransformerDecoderLayer(nn.Module):
         self.cross_self_attention = getattr(args, "cross_self_attention", False)
 
         self.relative_att = getattr(args, "relative_att", False)
+        self.coverage_att = getattr(args, "coverage_att", False)
 
         self.self_attn = self.build_self_attention(
             self.embed_dim, args, add_bias_kv=add_bias_kv, add_zero_attn=add_zero_attn,
@@ -249,6 +251,17 @@ class TransformerDecoderLayer(nn.Module):
     def build_self_attention(
         self, embed_dim, args, add_bias_kv=False, add_zero_attn=False
     ):
+        if self.coverage_att:
+            return MultiheadCoverageAttention(
+                embed_dim,
+                args.decoder_attention_heads,
+                dropout=args.attention_dropout,
+                add_bias_kv=add_bias_kv,
+                add_zero_attn=add_zero_attn,
+                self_attention=not getattr(args, "cross_self_attention", False),
+                q_noise=self.quant_noise,
+                qn_block_size=self.quant_noise_block_size,
+            )
         if self.relative_att:
             return RelativeMultiheadAttention(
                 embed_dim,

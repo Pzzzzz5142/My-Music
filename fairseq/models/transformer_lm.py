@@ -152,6 +152,7 @@ class TransformerLanguageModelConfig(FairseqDataclass):
         default=8,
         metadata={"help": "block size of quantization noise at training time"},
     )
+    coverage_att: bool = field(default=False)
     # TODO common var add to parent
     quant_noise_scalar: float = field(
         default=0.0,
@@ -415,6 +416,7 @@ def transformer_lm_gpt2_big(args):
 def transformer_lm_relative(args):
     args.relative_att = getattr(args, "relative_att", True)
     base_lm_architecture(args)
+
 
 @register_model_architecture("transformer_lm", "transformer_lm_small")
 def transformer_lm_small(args):

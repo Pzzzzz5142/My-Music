@@ -232,6 +232,7 @@ class TransformerLanguageModelConfig(FairseqDataclass):
         default=8,
         metadata={"help": "block size of quantization noise at training time"},
     )
+    relative_att: bool = field(default=False)
     # TODO common var add to parent
     quant_noise_scalar: float = field(
         default=0.0,
@@ -246,7 +247,7 @@ class TransformerLanguageModelConfig(FairseqDataclass):
 
 
 @register_model("transformer_lm_hi", dataclass=TransformerLanguageModelConfig)
-class TransformerLanguageModel(FairseqLanguageModel):
+class TransformerLanguageModelHi(FairseqLanguageModel):
     @classmethod
     def hub_models(cls):
         def moses_fastbpe(path):

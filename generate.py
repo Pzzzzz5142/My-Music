@@ -42,7 +42,7 @@ def topk_sampling(x, topk):
 
 custom_lm = (
     TransformerLanguageModel.from_pretrained(
-        "/mnt/zhangyi/checkpoints/transformer_music_lm_remi_midi", "checkpoint_best.pt",
+        "/mnt/zhangyi/checkpoints/transformer_music_lm_remi_cov", "checkpoint_best.pt",
     )
     .cuda()
     .half()
@@ -53,7 +53,7 @@ for i in range(0, 100):
     l = 2048
     a = []
     s = 1
-    ss = "<time_shift,0>"
+    ss = "<Bar,None>"
     if len(ss) == 0:
         input_sequence = custom_lm.encode(" ".join(encode_midi("primer.mid")))[:-1]
         with open("data/mae.test.tokens", "r") as fl:

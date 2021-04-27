@@ -1,6 +1,6 @@
 fairseq-train --task language_modeling \
-  data-bin/remi_midi \
-  --save-dir /mnt/zhangyi/checkpoints/transformer_music_lm_remi_midi \
+  data-bin/remi \
+  --save-dir /mnt/zhangyi/checkpoints/transformer_music_lm_remi_cov \
   --tensorboard-logdir tensorboard \
   --arch transformer_lm --share-decoder-input-output-embed \
   --dropout 0.1 \
@@ -10,3 +10,4 @@ fairseq-train --task language_modeling \
   --max-tokens 4096 --update-freq 1 \
   --max-update 50000 \
   --future-target \
+  --coverage-att \

@@ -1086,7 +1086,6 @@ class MultiheadCoverageAttention(MultiheadAttention):
         assert embed_dim == self.embed_dim
         assert list(query.size()) == [tgt_len, bsz, embed_dim]
 
-
         if incremental_state is not None:
             saved_state = self._get_input_buffer(incremental_state)
             if saved_state is not None and "prev_key" in saved_state:
@@ -1248,6 +1247,19 @@ class MultiheadCoverageAttention(MultiheadAttention):
                 attn_weights = attn_weights.masked_fill(key_padding_mask, float("-inf"))
                 attn_weights = attn_weights.transpose(0, 2)
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
+
+        coverage_att = attn_weights.new_zeros(attn_weights.size(), requires_grad=True)
+        coverage_att = torch.where(
+            attn_weights == float("-inf"), coverage_att, attn_weights
+        )
+        coverage_att = torch.cat(
+            [
+                coverage_att.new_zeros(coverage_att[:, :1, ...].shape),
+                coverage_att[:, :-1, ...],
+            ],
+            dim=1,
+        )
+        attn_weights -= 0.1 * coverage_att
 
         if before_softmax:
             return attn_weights, v

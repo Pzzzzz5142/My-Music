@@ -446,8 +446,6 @@ class TransformerDecoderHi(TransformerDecoder):
         for index in chord_indices:
             tmp, _, _ = self.ChordTransformerLayer(
                 x[index[0], index[1][0] : index[1][1], ...]
-                .clone()
-                .detach()
                 .unsqueeze(0)
             )
             x[index[0], index[1][0] : index[1][1], ...] += tmp.squeeze(0)

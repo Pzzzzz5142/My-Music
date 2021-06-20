@@ -123,3 +123,4 @@ tmp_*
 fl
 saved_models/*
 *.loss
+*.tokens

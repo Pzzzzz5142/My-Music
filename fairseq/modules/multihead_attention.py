@@ -531,6 +531,8 @@ class RelativeMultiheadAttention(nn.Module):
 
         self.add_zero_attn = add_zero_attn
 
+        self.relative_positions_matrices = self._generate_relative_positions_matrix()
+
         self.relative_position_keys = Parameter(
             torch.Tensor(2 * self.max_relative_length + 1, self.head_dim)
         )
@@ -831,6 +833,26 @@ class RelativeMultiheadAttention(nn.Module):
         )
 
     def _generate_relative_positions_matrix(
+        self, length, max_relative_length, incremental_state
+    ):
+        if not incremental_state:
+            # training process
+            range_vec = torch.arange(length).cuda()
+            range_mat = range_vec.repeat(length, 1)
+            distance_mat = range_mat - range_mat.transpose(0, 1)
+        else:
+            distance_mat = torch.range(-length + 1, 0).cuda().view(1, -1)
+
+        distance_mat_clipped = torch.clamp(
+            distance_mat, -max_relative_length, max_relative_length
+        ).cuda()
+
+        # position difference.
+        final_mat = distance_mat_clipped + max_relative_length
+
+        return final_mat
+
+    def _select_relative_positions_matrix(
         self, length, max_relative_length, incremental_state
     ):
         if not incremental_state:

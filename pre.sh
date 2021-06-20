@@ -1,6 +1,6 @@
 fairseq-preprocess \
     --only-source \
-    --trainpref data/mae_remi.train.tokens \
-    --validpref data/mae_remi.valid.tokens \
-    --testpref data/mae_remi.test.tokens \
-    --destdir data-bin/mae_remi --workers 20
+    --trainpref train.train.tokens \
+    --validpref train.valid.tokens \
+    --testpref train.test.tokens \
+    --destdir data-bin/remi_midi --workers 20

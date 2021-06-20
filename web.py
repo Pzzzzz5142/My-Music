@@ -1,3 +1,6 @@
+from typing import Optional
+from pynvml import *
+from fastapi import FastAPI
 from fairseq.models.transformer_lm import TransformerLanguageModel
 from fairseq.models.transformer_autoencoders import TransformerAutoencoders
 import torch
@@ -6,7 +9,7 @@ import torch.nn.functional as F
 from random import randint
 from midi_preprocess import encode_midi, decode_midi
 import utils
-
+import base64
 
 def temperature_sampling(x, temperature, topk):
     logits = x.cpu().detach().numpy()[0]
@@ -40,55 +43,31 @@ def topk_sampling(x, topk):
     return x.new([prediction]).int()[None]
 
 
-custom_lm = (
-    TransformerLanguageModel.from_pretrained(
-        "/mnt/zhangyi/checkpoints/transformer_music_lm_remi_cov", "checkpoint_best.pt",
+def compose(dev: int):
+    custom_lm = (
+        TransformerLanguageModel.from_pretrained(
+            "/mnt/zhangyi/checkpoints/transformer_music_lm_remi_cov",
+            "checkpoint_best.pt",
+        )
+        .cuda(dev)
+        .half()
+        .eval()
     )
-    .cuda()
-    .half()
-    .eval()
-)
-model = custom_lm.models[0]
-for i in range(0, 100):
-    l = 2048
+    model = custom_lm.models[0]
+    l = 1024
     a = []
-    s = 1
     ss = "<time_shift,0>"
-    if len(ss) == 0:
-        input_sequence = custom_lm.encode(" ".join(encode_midi("primer.mid")))[:-1]
-        with open("data/mae.test.tokens", "r") as fl:
-            ss = fl.readline().strip().split()[3 : 3 + 2048]
-        prev_input_seq = custom_lm.encode(" ".join(ss))[:-1]
-    else:
-        input_sequence = custom_lm.encode(ss)[:-1]
-        print(len(input_sequence))
+    input_sequence = custom_lm.encode(ss)[:-1]
     input_tensor = torch.LongTensor(input_sequence).cuda().unsqueeze(0)
     # prev_input_tensor = torch.LongTensor(prev_input_seq).cuda().unsqueeze(0)
     print("ok")
     a = custom_lm.decode(torch.LongTensor(input_sequence).cuda()).split()
     print(input_sequence.shape)
     try:
-        flg = 0
         for ind in range(len(input_sequence), l):
             x = model(input_tensor[-2000:, :])[0]
-            y = x.clone().detach()
             x = F.softmax(x, dim=2)[:, -1, :]
-            if flg:
-                xx = F.softmax(y, dim=2)
-                xx = xx.topk(1, dim=2)[1]
-                flg -= 1
-                decode_midi(
-                    custom_lm.decode(xx[0, :, 0]).split(), file_path="final2.mid"
-                )
-            if False:
-                distrib = torch.distributions.categorical.Categorical(probs=x[None])
-                next_token = distrib.sample()
-            elif False:
-                next_token = x.topk(1)[1]
-            elif False:
-                next_token = temperature_sampling(x, 1.2, 5)
-            else:
-                next_token = topk_sampling(x, 5)
+            next_token = topk_sampling(x, 5)
             input_tensor = torch.cat([input_tensor[:, :], next_token], dim=1)
             a.append(custom_lm.decode(next_token))
             if ind % 100 == 0:
@@ -96,9 +75,24 @@ for i in range(0, 100):
                 with open("fl.txt", "w") as fl:
                     print(" ".join(a), file=fl)
     except Exception as e:
-        print(e)
         print("Abort lenght {}".format(len(a)))
+    utils.write_midi(a, None, "tmp.mid", None)
+    custom_lm.cpu()
+    del custom_lm
+    with open("tmp.mid", "rb") as fl:
+        return base64.b64encode(fl.read())
+
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    dev = 0
+    if dev == -1:
+        return {"success": False, "error": "No enough memory"}
     try:
-        decode_midi(a, file_path="remi_midi/{}.mid".format(i))
+        thing = compose(dev)
+        return {"success": True, "song": str(thing, encoding="utf-8")}
     except:
-        utils.write_midi(a, None, "remi_cov_top1/{}.mid".format(i), None)
+        return {"success": False, "error": "Compose Error"}

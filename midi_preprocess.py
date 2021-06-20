@@ -257,7 +257,7 @@ def decode_midi(idx_array, developer="Pzzzzz", file_path=None):
     event_sequence = [
         Event.from_token(idx) if not isinstance(idx, Event) else idx
         for idx in idx_array
-        if "unk" not in idx and "pad" not in idx
+        if "unk" not in idx and "pad" not in idx and idx != ""
     ]
     # print(event_sequence)
     snote_seq = _event_seq2snote_seq(event_sequence)
@@ -400,15 +400,24 @@ def main(args):
         train = 8 * total // 10
         valid = total // 10
         test = total - train - valid
+        global cnt
         cnt = 0
 
-        prefix = os.path.split(args.datadir)[-1]
+        if args.prefix == None:
+            prefix = os.path.split(args.datadir)[-1]
+        else:
+            prefix = args.prefix
 
         print(
             "Total {} midi files, split to {} train sample(s) | {} test sample(s) | {} train sample(s)\nPrefix: {}".format(
                 total, train, test, valid, prefix
             )
         )
+        try:
+            for sp in ["test", "train", "valid"]:
+                os.remove(os.path.join(args.destdir, f"{prefix}.{sp}.tokens"))
+        except FileNotFoundError:
+            pass
 
         pool = Pool(args.workers)
 
@@ -432,7 +441,7 @@ def main(args):
                     else:
                         vd.write(line)
                     cnt += 1
-            print(f"{Thread_ind} finished. ")
+            print(f"Thread {Thread_ind} finished. ")
 
         step = (total + args.workers - 1) // args.workers
         for ind in range(0, total, step):
@@ -451,43 +460,49 @@ def main(args):
             open(os.path.join(args.datadir, "maestro-v2.0.0.json"), "r")
         )
 
-        if not os.path.exists(args.destdir + "/a.token"):
-            pool = Pool(args.workers)
+        try:
+            for sp in ["test", "train", "valid"]:
+                os.remove(os.path.join(args.destdir, f"mae_remi.{sp}.tokens"))
+        except FileNotFoundError:
+            pass
 
-            def merge_results(worker_result):
-                Thread_ind, worker_result = worker_result
-                global maestro_json
-                with open(args.destdir + "/mae_remi.test.tokens", "a+") as tst, open(
-                    args.destdir + "/mae_remi.train.tokens", "a+"
-                ) as tr, open(args.destdir + "/mae_remi.valid.tokens", "a+") as vd:
-                    for line in worker_result:
-                        split, line = line[0], " ".join(line[1:])
-                        if len(line.strip().split()) < 2048:
-                            continue
-                        line += "\n"
-                        if split == "train":
-                            tr.write(line)
-                        elif split == "test":
-                            tst.write(line)
-                        else:
-                            vd.write(line)
-                print(f"{Thread_ind} finished. ")
+        pool = Pool(args.workers)
 
-            seg = (len(maestro_json) + args.workers - 1) // args.workers
-            ind = 0
+        def merge_results(worker_result):
+            worker_result, Thread_ind = worker_result
+            global maestro_json
+            with open(args.destdir + "/mae_remi.test.tokens", "a+") as tst, open(
+                args.destdir + "/mae_remi.train.tokens", "a+"
+            ) as tr, open(args.destdir + "/mae_remi.valid.tokens", "a+") as vd:
+                for line in worker_result:
+                    split, line = line[0], " ".join(line[1:])
+                    if len(line.strip().split()) < 2048:
+                        continue
+                    line += "\n"
+                    if split == "train":
+                        tr.write(line)
+                    elif split == "test":
+                        tst.write(line)
+                    else:
+                        vd.write(line)
+            print(f"{Thread_ind} finished. ")
 
-            for i in range(args.workers):
-                if i == args.workers - 1:
-                    seg = len(maestro_json)
-                pool.apply_async(
-                    remi_encode_single_worker,
-                    (args, maestro_json[ind : ind + seg]),
-                    callback=merge_results,
-                )
-                print(ind, ind + seg)
-                ind += seg
-            pool.close()
-            pool.join()
+        seg = (len(maestro_json) + args.workers - 1) // args.workers
+        ind = 0
+
+        for i in range(args.workers):
+            if i == args.workers - 1:
+                seg = len(maestro_json)
+            result = pool.apply_async(
+                encode_single_worker,
+                (args, i, maestro_json[ind : ind + seg]),
+                callback=merge_results,
+            )
+            print(ind, ind + seg)
+            ind += seg
+        result.get()
+        pool.close()
+        pool.join()
 
 
 def cli_main():
@@ -501,6 +516,7 @@ def cli_main():
     )
     parser.add_argument("--datadir", metavar="DIR", default="data", help="data dir")
     parser.add_argument("--workers", type=int, default="20")
+    parser.add_argument("--prefix", type=str)
     args = parser.parse_args()
     main(args)
 
